@@ -41,10 +41,10 @@ class SignalDailyUser(AbstractUser):
     role = models.CharField(max_length=16, choices=ROLE_CHOICES, default=ROLE_READER)
     subscribed_publishers = models.ManyToManyField('Publisher', blank=True, related_name='subscribers')
     subscribed_journalists = models.ManyToManyField('self', blank=True, symmetrical=False, related_name='journalist_subscribers')
-    security_question = models.CharField(max_length=255, blank=True, null=True)
+        security_question = models.CharField(max_length=255, blank=True, null=True)
     security_answer = models.CharField(max_length=255, blank=True, null=True)
 
-        def save(self, *args, **kwargs):
+    def save(self, *args, **kwargs):
         """Save user and automatically assign appropriate group based on role.
         
         Non-reader roles cannot have subscriptions, so they are cleared.
@@ -55,7 +55,7 @@ class SignalDailyUser(AbstractUser):
             self.subscribed_publishers.clear()
             self.subscribed_journalists.clear()
 
-        def assign_group(self):
+    def assign_group(self):
         """Assign the user to the appropriate Django group based on their role.
         
         Ensures the user belongs to exactly one role group (Reader, Journalist, or Editor)
@@ -168,10 +168,10 @@ class Article(models.Model):
             self.slug = slugify(self.title)[:255]
         super().save(*args, **kwargs)
 
-    def __str__(self):
+        def __str__(self):
         return self.title
 
-        @property
+    @property
     def headline_image(self):
         """Get the URL of the first image attached to this article.
         
@@ -194,11 +194,11 @@ class ArticleImage(models.Model):
         caption (str): Optional caption describing the image.
     """
 
-    article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name='images')
+        article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name='images')
     image = models.ImageField(upload_to='article_images/')
     caption = models.CharField(max_length=255, blank=True)
 
-        def clean(self):
+    def clean(self):
         """Validate that uploaded images meet minimum size requirements.
         
         Raises:
