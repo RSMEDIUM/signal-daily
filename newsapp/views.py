@@ -49,17 +49,7 @@ User = get_user_model()
 
 
 def home(request):
-    """Render the homepage with hero, featured articles, and newsletter signup.
-    
-    Displays a pinned hero article (or featured if no pinned), up to 6 featured
-    articles, recent articles, and a newsletter signup form.
-    
-    Args:
-        request: HTTP request object.
-    
-    Returns:
-        HttpResponse: Rendered home page template.
-    """
+    """Render the homepage with hero, featured articles, and newsletter signup."""
     hero_article = Article.objects.filter(approved=True, pinned=True).order_by('-created_at').first()
     if not hero_article:
         hero_article = Article.objects.filter(approved=True, featured=True).order_by('-created_at').first()
@@ -78,16 +68,6 @@ def home(request):
 
 
 def newsletter_signup(request):
-    """Handle newsletter signup form submission from homepage.
-    
-    Creates a new NewsletterSubscriber record or notifies if already subscribed.
-    
-    Args:
-        request: HTTP POST request with email field.
-    
-    Returns:
-        HttpResponse: Redirect to home page with success/error message.
-    """
     if request.method != 'POST':
         return redirect('home')
     form = NewsletterSignupForm(request.POST)
@@ -104,58 +84,19 @@ def newsletter_signup(request):
 
 
 def _is_editor(user):
-    """Check if user has editor privileges.
-    
-    Args:
-        user: User instance to check.
-    
-    Returns:
-        bool: True if user is authenticated and is superuser or has editor role.
-    """
     return user.is_authenticated and (user.is_superuser or user.role == 'editor')
 
 
 def about(request):
-    """Render the about page.
-    
-    Args:
-        request: HTTP request object.
-    
-    Returns:
-        HttpResponse: Rendered about page template.
-    """
     return render(request, 'newsapp/about.html')
 
 
 def article_list(request):
-    """Display a list of all approved articles.
-    
-    Args:
-        request: HTTP request object.
-    
-    Returns:
-        HttpResponse: Rendered article list page with approved articles.
-    """
     articles = Article.objects.filter(approved=True).order_by('-created_at')
     return render(request, 'newsapp/article_list.html', {'articles': articles})
 
 
 def article_detail(request, slug):
-    """Display a single article and handle comment submissions.
-    
-    Only approved articles are visible to the public. Unapproved articles can
-    only be viewed by their author, editors, or superusers.
-    
-    Args:
-        request: HTTP request object (POST to submit comments).
-        slug (str): URL slug identifying the article.
-    
-    Returns:
-        HttpResponse: Rendered article detail page with comments.
-    
-    Raises:
-        Http404: If article is not approved and user lacks permission.
-    """
     article = get_object_or_404(Article, slug=slug)
     if not article.approved:
         allowed = (
@@ -192,15 +133,6 @@ def article_detail(request, slug):
 
 
 def category_articles(request, slug):
-    """Display all approved articles in a specific category.
-    
-    Args:
-        request: HTTP request object.
-        slug (str): Category slug identifier.
-    
-    Returns:
-        HttpResponse: Rendered category page with filtered articles.
-    """
     category = get_object_or_404(Category, slug=slug)
     articles = category.articles.filter(approved=True).order_by('-created_at')
     return render(request, 'newsapp/category_articles.html', {'category': category, 'articles': articles})
@@ -208,17 +140,6 @@ def category_articles(request, slug):
 
 @login_required
 def staff_dashboard(request):
-    """Display journalist/editor dashboard with their articles and pending approvals.
-    
-    Journalists see their own articles. Editors also see all pending articles
-    awaiting approval.
-    
-    Args:
-        request: HTTP request object.
-    
-    Returns:
-        HttpResponse: Rendered staff dashboard or 403 if not authorized.
-    """
     if not (request.user.is_superuser or request.user.role in ['editor', 'journalist']):
         return HttpResponseForbidden()
 
@@ -265,16 +186,7 @@ def secret_admin(request):
 
 
 def register_view(request):
-    """Handle new user registration and role assignment.
-    
-    Creates a new user account with selected role and optional security question.
-    
-    Args:
-        request: HTTP request object (POST to submit registration).
-    
-    Returns:
-        HttpResponse: Rendered registration form or redirect to login on success.
-    """
+    """Handle new user registration and role assignment."""
     if request.method == 'POST':
         form = RegistrationForm(request.POST)
         if form.is_valid():
@@ -289,14 +201,7 @@ def register_view(request):
 
 
 def login_view(request):
-    """Authenticate a user and start a login session.
-    
-    Args:
-        request: HTTP request object (POST to submit credentials).
-    
-    Returns:
-        HttpResponse: Rendered login form or redirect to home on success.
-    """
+    """Authenticate a user and start a login session."""
     if request.method == 'POST':
         form = SignalDailyLoginForm(request, data=request.POST)
         if form.is_valid():
@@ -310,30 +215,12 @@ def login_view(request):
 
 @login_required
 def logout_view(request):
-    """Log out the current user and end their session.
-    
-    Args:
-        request: HTTP request object.
-    
-    Returns:
-        HttpResponse: Redirect to home page with logout confirmation.
-    """
     logout(request)
     messages.success(request, 'You are logged out.')
     return redirect('home')
 
 
 def password_reset_request(request):
-    """Handle password reset request via security question.
-    
-    Validates email and checks if user has a security question configured.
-    
-    Args:
-        request: HTTP request object (POST to submit email).
-    
-    Returns:
-        HttpResponse: Rendered reset form or redirect to security question.
-    """
     if request.method == 'POST':
         form = PasswordResetRequestForm(request.POST)
         if form.is_valid():
@@ -349,17 +236,6 @@ def password_reset_request(request):
 
 
 def security_question(request):
-    """Verify security answer and allow password reset.
-    
-    Retrieves user from session, verifies their security answer, and resets
-    password if answer is correct.
-    
-    Args:
-        request: HTTP request object (POST to submit answer and new password).
-    
-    Returns:
-        HttpResponse: Rendered security question form or redirect on success.
-    """
     user_pk = request.session.get('reset_user')
     if not user_pk:
         return redirect('password_reset_request')
@@ -383,17 +259,6 @@ def security_question(request):
 
 @login_required
 def subscribe_publisher(request, pk):
-    """Subscribe a reader to a publisher to receive article notifications.
-    
-    Only users with 'reader' role can subscribe to publishers.
-    
-    Args:
-        request: HTTP request object.
-        pk (int): Publisher primary key.
-    
-    Returns:
-        HttpResponse: Redirect to article list with confirmation message.
-    """
     publisher = get_object_or_404(Publisher, pk=pk)
     if request.user.role != 'reader':
         return HttpResponseForbidden()
@@ -404,17 +269,6 @@ def subscribe_publisher(request, pk):
 
 @login_required
 def subscribe_journalist(request, pk):
-    """Subscribe a reader to a journalist to receive article notifications.
-    
-    Only users with 'reader' role can subscribe to journalists.
-    
-    Args:
-        request: HTTP request object.
-        pk (int): Journalist user primary key.
-    
-    Returns:
-        HttpResponse: Redirect to article list with confirmation message.
-    """
     journalist = get_object_or_404(User, pk=pk, role='journalist')
     if request.user.role != 'reader':
         return HttpResponseForbidden()
@@ -425,17 +279,7 @@ def subscribe_journalist(request, pk):
 
 @login_required
 def create_article(request):
-    """Create an article and associate uploaded images with it.
-    
-    Journalists and editors can create articles. Journalists' articles require
-    editor approval before publication. Uses formsets for multiple image uploads.
-    
-    Args:
-        request: HTTP request object (POST to submit article).
-    
-    Returns:
-        HttpResponse: Rendered article form or redirect to article/dashboard on success.
-    """
+    """Create an article and associate uploaded images with it."""
     if not (request.user.is_superuser or request.user.role in ['journalist', 'editor']):
         return HttpResponseForbidden()
 
@@ -685,15 +529,7 @@ def edit_publisher(request, pk):
 class CustomAuthToken(ObtainAuthToken):
     """Issue token authentication credentials for API users."""
 
-        def post(self, request, *args, **kwargs):
-        """Authenticate and return API token for the user.
-        
-        Args:
-            request: HTTP request with username and password.
-        
-        Returns:
-            Response: JSON with token, user_id, and role.
-        """
+    def post(self, request, *args, **kwargs):
         serializer = self.serializer_class(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data['user']
@@ -702,23 +538,13 @@ class CustomAuthToken(ObtainAuthToken):
 
 
 class ArticleViewSet(viewsets.ModelViewSet):
-    """REST API endpoint for CRUD operations on articles.
-    
-    Provides list, retrieve, create, update, and delete operations for articles.
-    Only approved articles are visible in list/retrieve. Creation requires
-    journalist role. Update/delete require editor or ownership.
-    """
+    """REST API endpoint for CRUD operations on articles."""
     queryset = Article.objects.all().select_related('author', 'publisher').prefetch_related('images')
     serializer_class = ArticleSerializer
     authentication_classes = [TokenAuthentication]
     permission_classes = [permissions.IsAuthenticated]
 
     def get_permissions(self):
-        """Return appropriate permission classes based on the action.
-        
-        Returns:
-            list: Permission class instances for the current action.
-        """
         if self.action == 'create':
             permission_classes = [permissions.IsAuthenticated, IsJournalist]
         elif self.action in ['update', 'partial_update', 'destroy']:
@@ -727,23 +553,13 @@ class ArticleViewSet(viewsets.ModelViewSet):
             permission_classes = [permissions.IsAuthenticated]
         return [permission() for permission in permission_classes]
 
-        def get_queryset(self):
-        """Filter articles based on action - only approved for list/retrieve.
-        
-        Returns:
-            QuerySet: Filtered article queryset.
-        """
+    def get_queryset(self):
         queryset = super().get_queryset()
         if self.action in ['list', 'retrieve']:
             return queryset.filter(approved=True)
         return queryset
 
-        def perform_create(self, serializer):
-        """Set author and approval status when creating articles via API.
-        
-        Args:
-            serializer: Validated article serializer.
-        """
+    def perform_create(self, serializer):
         article = serializer.save(author=self.request.user)
         if self.request.user.role == 'journalist':
             article.approved = False
@@ -775,21 +591,12 @@ class NewsletterSubscriberViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class SubscribedArticleListAPIView(generics.ListAPIView):
-    """Return articles for the requesting reader's subscriptions.
-    
-    Filters approved articles to only those from publishers or journalists
-    the reader has subscribed to.
-    """
+    """Return articles for the requesting reader's subscriptions."""
     serializer_class = ArticleSerializer
     authentication_classes = [TokenAuthentication]
     permission_classes = [permissions.IsAuthenticated]
 
-        def get_queryset(self):
-        """Return articles from user's subscriptions.
-        
-        Returns:
-            QuerySet: Approved articles from subscribed publishers/journalists.
-        """
+    def get_queryset(self):
         user = self.request.user
         if user.role != 'reader':
             return Article.objects.filter(approved=True)
@@ -805,12 +612,4 @@ class ApprovedLogAPIView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
-        """Log article approval data sent from signal handlers.
-        
-        Args:
-            request: HTTP POST request with article approval data.
-        
-        Returns:
-            Response: JSON confirmation message.
-        """
         return Response({'status': 'approved payload received', 'payload': request.data}, status=status.HTTP_200_OK)
