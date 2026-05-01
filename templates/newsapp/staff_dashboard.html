@@ -1,0 +1,55 @@
+{% extends 'newsapp/base.html' %}
+
+{% block content %}
+<section class="page-header">
+    <h1>Editorial Portal</h1>
+    <p>Write articles, review drafts, approve submissions, and manage publications.</p>
+    <div class="header-actions">
+        <a class="button" href="{% url 'create_article' %}">Create Article</a>
+        {% if user.is_authenticated and user.is_superuser or user.is_authenticated and user.role == 'editor' %}
+            <a class="button button-secondary" href="{% url 'publisher_list' %}">Manage Publications</a>
+        {% endif %}
+    </div>
+</section>
+
+<section class="article-listing-container">
+    <h2>Your Articles</h2>
+    {% for article in your_articles %}
+        <article class="list-card">
+            <div>
+                <h3><a href="{% url 'article_detail' article.slug %}">{{ article.title }}</a></h3>
+                <p>{{ article.summary|default:article.content|truncatechars:140 }}</p>
+            </div>
+            <div class="meta-row">
+                <small>{% if article.approved %}Approved{% else %}Draft{% endif %} • {{ article.created_at|date:'M d, Y' }}</small>
+                {% if user.is_superuser or user.role == 'editor' or article.author == user %}
+                    <a class="button button-small" href="{% url 'edit_article' article.slug %}">Edit</a>
+                {% endif %}
+            </div>
+        </article>
+    {% empty %}
+        <p>You have not created any articles yet.</p>
+    {% endfor %}
+</section>
+
+{% if pending_articles %}
+<section class="article-listing-container">
+    <h2>Pending Approval</h2>
+    {% for article in pending_articles %}
+        <article class="list-card">
+            <div>
+                <h3><a href="{% url 'article_detail' article.slug %}">{{ article.title }}</a></h3>
+                <p>{{ article.summary|default:article.content|truncatechars:140 }}</p>
+            </div>
+            <div class="meta-row">
+                <small>{{ article.author.username }} • {{ article.created_at|date:'M d, Y' }}</small>
+                <div>
+                    <a class="button button-small" href="{% url 'edit_article' article.slug %}">Edit</a>
+                    <a class="button button-small" href="{% url 'approve_article' article.slug %}">Approve</a>
+                </div>
+            </div>
+        </article>
+    {% endfor %}
+</section>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,29 @@
+{% extends 'newsapp/base.html' %}
+
+{% block content %}
+<section class="page-header">
+    <div>
+        <h1>{{ category.name }}</h1>
+        <p>{{ category.description }}</p>
+    </div>
+</section>
+
+<section class="article-cards">
+    <div class="grid-grid">
+        {% for article in articles %}
+            <article class="card-card">
+                {% if article.headline_image %}
+                    <img src="{{ article.headline_image }}" alt="{{ article.title }}" class="card-image">
+                {% endif %}
+                <div class="card-body">
+                    <h3><a href="{% url 'article_detail' article.slug %}">{{ article.title }}</a></h3>
+                    <p>{{ article.summary|default:article.content|truncatechars:110 }}</p>
+                    <p class="meta">By {{ article.author.username }} • {{ article.created_at|date:'M d, Y' }}</p>
+                </div>
+            </article>
+        {% empty %}
+            <p>No published stories yet in this category.</p>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}

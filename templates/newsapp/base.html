@@ -1,0 +1,62 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signal Daily</title>
+    <link rel="stylesheet" href="{% static 'newsapp/css/styles.css' %}">
+</head>
+<body>
+    <header class="site-header">
+        <div class="site-brand">
+            <img src="/media/logo.png" alt="Signal Daily logo" class="site-logo">
+            <div>
+                <a href="{% url 'home' %}"><strong>Signal Daily</strong></a>
+                <p>Modern reporting for developers.</p>
+            </div>
+        </div>
+        <nav class="site-nav">
+            <a href="{% url 'home' %}">Home</a>
+            <a href="{% url 'article_list' %}">Articles</a>
+            {% if user.is_authenticated and user.is_superuser or user.is_authenticated and user.role == 'editor' %}
+                <a href="{% url 'newsletter_list' %}">Newsletters</a>
+                <a href="{% url 'publisher_list' %}">Publications</a>
+            {% endif %}
+            <a href="{% url 'about' %}">About</a>
+            {% if user.is_authenticated and user.is_superuser or user.is_authenticated and user.role == 'editor' or user.is_authenticated and user.role == 'journalist' %}
+                <a href="{% url 'staff_dashboard' %}">Editorial Portal</a>
+            {% endif %}
+            {% if user.is_authenticated and user.is_superuser %}
+                <a href="{% url 'secret_admin' %}">Program Panel</a>
+            {% endif %}
+            {% if user.is_authenticated %}
+                <a href="{% url 'logout' %}">Logout</a>
+            {% else %}
+                <a href="{% url 'login' %}">Login</a>
+                <a href="{% url 'register' %}">Register</a>
+            {% endif %}
+        </nav>
+        {% if category_menu_items %}
+            <div class="category-links">
+                {% for category in category_menu_items %}
+                    <a href="{% url 'category_articles' category.slug %}">{{ category.name }}</a>
+                {% endfor %}
+            </div>
+        {% endif %}
+    </header>
+    <main class="page-shell">
+        {% if messages %}
+            <div class="messages">
+                {% for message in messages %}
+                    <div class="message {{ message.tags }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+        {% block content %}{% endblock %}
+    </main>
+    <footer class="page-footer">
+        <p>Signal Daily copyright 2026 RSMEDIUM</p>
+    </footer>
+</body>
+</html>

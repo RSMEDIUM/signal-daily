@@ -1,0 +1,5 @@
+Django>=6.0
+djangorestframework
+requests
+Pillow
+mysql-connector-python

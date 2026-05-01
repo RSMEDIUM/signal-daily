@@ -1,0 +1,32 @@
+{% extends 'newsapp/base.html' %}
+{% block content %}
+<article class="article-detail">
+    <header>
+        <h1>{{ newsletter.title }}</h1>
+        <p class="meta">By {{ newsletter.author.username }} • {{ newsletter.created_at|date:'M d, Y' }}</p>
+    </header>
+    <div class="article-content">{{ newsletter.description|linebreaks }}</div>
+    <section class="newsletter-articles">
+        <h2>Included Articles</h2>
+        <ul>
+            {% for article in newsletter.articles.all %}
+                <li><a href="{% url 'article_detail' article.slug %}">{{ article.title }}</a></li>
+            {% empty %}
+                <li>No articles are attached yet.</li>
+            {% endfor %}
+        </ul>
+    </section>
+    {% if user.is_authenticated and user.is_superuser or user.is_authenticated and user.role == 'editor' %}
+        <div class="article-actions">
+            <a class="button" href="{% url 'send_newsletter' newsletter.pk %}">Send Newsletter</a>
+            <a class="button" href="{% url 'edit_newsletter' newsletter.pk %}">Edit</a>
+            <a class="button" href="{% url 'delete_newsletter' newsletter.pk %}">Delete</a>
+        </div>
+    {% elif user.is_authenticated and user.role == 'journalist' %}
+        <div class="article-actions">
+            <a class="button" href="{% url 'edit_newsletter' newsletter.pk %}">Edit</a>
+            <a class="button" href="{% url 'delete_newsletter' newsletter.pk %}">Delete</a>
+        </div>
+    {% endif %}
+</article>
+{% endblock %}

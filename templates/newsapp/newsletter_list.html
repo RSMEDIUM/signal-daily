@@ -1,0 +1,66 @@
+{% extends 'newsapp/base.html' %}
+{% block content %}
+<section class="page-header">
+    <h1>Newsletters</h1>
+    <div class="header-actions">
+        <a class="button" href="{% url 'create_newsletter' %}">New Newsletter</a>
+        <a class="button button-secondary" href="{% url 'publisher_list' %}">Manage Publications</a>
+    </div>
+</section>
+<section class="article-listing-container">
+    {% for newsletter in newsletters %}
+        <article class="list-card">
+            <div>
+                <h2><a href="{% url 'newsletter_detail' newsletter.pk %}">{{ newsletter.title }}</a></h2>
+                <p>{{ newsletter.description|truncatechars:140 }}</p>
+            </div>
+            <div class="meta-row">
+                <small>{{ newsletter.author.username }} • {{ newsletter.created_at|date:'M d, Y' }}</small>
+            </div>
+        </article>
+    {% empty %}
+        <p>No newsletters available yet.</p>
+    {% endfor %}
+</section>
+
+<section class="subscriber-table">
+    <h2>Newsletter Subscribers</h2>
+    <button id="copy-emails" class="button button-secondary">Copy All Emails</button>
+    <table>
+        <thead>
+            <tr>
+                <th>Email</th>
+                <th>Date subscribed</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for subscriber in subscribers %}
+                <tr>
+                    <td>{{ subscriber.email }}</td>
+                    <td>{{ subscriber.created_at|date:'M d, Y H:i' }}</td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="2">No newsletter subscribers yet.</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <textarea id="copy-text" style="position:absolute;left:-9999px;" readonly>
+        {% for subscriber in subscribers %}{{ subscriber.email }}{% if not forloop.last %},{% endif %}{% endfor %}
+    </textarea>
+</section>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const copyButton = document.getElementById('copy-emails');
+        const copyText = document.getElementById('copy-text');
+        if (copyButton && copyText) {
+            copyButton.addEventListener('click', function () {
+                copyText.select();
+                document.execCommand('copy');
+                alert('Subscriber emails copied to clipboard.');
+            });
+        }
+    });
+</script>
+{% endblock %}

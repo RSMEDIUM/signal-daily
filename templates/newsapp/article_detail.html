@@ -1,0 +1,61 @@
+{% extends 'newsapp/base.html' %}
+{% block content %}
+<article class="article-detail">
+    <header>
+        <h1>{{ article.title }}</h1>
+        <p class="meta">By {{ article.author.username }} {% if article.publisher %} for {{ article.publisher.name }} {% endif %} • {{ article.created_at|date:'M d, Y' }}</p>
+    </header>
+    {% if article.headline_image %}
+        <img src="{{ article.headline_image }}" alt="{{ article.title }}" class="article-image">
+    {% endif %}
+    <div class="article-content">{{ article.content|linebreaks }}</div>
+    <section class="share-bar">
+        <p>Share this story</p>
+        <a href="https://twitter.com/intent/tweet?text={{ article.title|urlencode }}&url={{ share_url|urlencode }}" target="_blank">
+            <img src="https://uxwing.com/wp-content/themes/uxwing/download/brands-and-social-media/x-social-media-logo-icon.png" alt="Share on Twitter"> Twitter
+        </a>
+        <a href="mailto:?subject={{ article.title|urlencode }}&body={{ article.summary|default:article.content|truncatechars:150|urlencode }}%0A%0ARead%20more%3A%20{{ share_url|urlencode }}" target="_blank">
+            <img src="http://pluspng.com/img-png/email-icon-png-download-icons-logos-emojis-email-icons-2400.png" alt="Share by email"> Email
+        </a>
+    </section>
+    <div class="article-actions">
+        {% if user.is_authenticated and user.is_superuser or user.is_authenticated and user.role == 'journalist' or user.is_authenticated and user.role == 'editor' %}
+            <a class="button" href="{% url 'edit_article' article.slug %}">Edit</a>
+        {% endif %}
+        {% if user.is_authenticated and user.is_superuser and not article.approved or user.is_authenticated and user.role == 'editor' and not article.approved %}
+            <a class="button button-primary" href="{% url 'approve_article' article.slug %}">Approve</a>
+        {% endif %}
+        {% if user.is_authenticated and user.is_superuser or user.is_authenticated and user.role == 'editor' %}
+            <a class="button {% if article.pinned %}button-secondary{% else %}button-primary{% endif %}" href="{% url 'pin_article' article.slug %}">
+                {% if article.pinned %}Unpin from Hero{% else %}Pin to Hero{% endif %}
+            </a>
+        {% endif %}
+    </div>
+    <section class="comment-panel">
+        <h2>Comments</h2>
+        {% if comments %}
+            <ul class="comment-list">
+                {% for comment in comments %}
+                    <li>
+                        <p>{{ comment.content|linebreaks }}</p>
+                        <small>By {% if comment.author %}{{ comment.author.username }}{% else %}Guest{% endif %} • {{ comment.created_at|date:'M d, Y H:i' }}</small>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>No comments yet. Be the first to share your thoughts.</p>
+        {% endif %}
+
+        {% if user.is_authenticated %}
+            <form method="post" class="comment-form">
+                {% csrf_token %}
+                {{ comment_form.non_field_errors }}
+                <div class="form-group">{{ comment_form.content.label_tag }}{{ comment_form.content }}</div>
+                <button type="submit" class="button">Post Comment</button>
+            </form>
+        {% else %}
+            <p><a href="{% url 'login' %}">Sign in</a> to leave a comment.</p>
+        {% endif %}
+    </section>
+</article>
+{% endblock %}

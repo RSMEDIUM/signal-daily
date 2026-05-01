@@ -1,0 +1,84 @@
+{% extends 'newsapp/base.html' %}
+{% block content %}
+<section class="home-hero">
+    <div class="hero-copy">
+        <h1>Signal Daily</h1>
+        <p>Bold reporting, sharp editorial rhythm, and an agile newsroom.</p>
+        <div class="hero-actions">
+            <a class="button" href="{% url 'article_list' %}">Browse Articles</a>
+            <a class="button button-secondary" href="{% url 'newsletter_list' %}">Latest Newsletters</a>
+        </div>
+    </div>
+    <div class="hero-feature">
+        {% if hero_article %}
+            <article class="lead-card">
+                <div class="lead-copy">
+                    <span class="eyebrow">This Week's Hero Story</span>
+                    <h2><a href="{% url 'article_detail' hero_article.slug %}">{{ hero_article.title }}</a></h2>
+                    <p>{{ hero_article.summary|default:hero_article.content|truncatechars:160 }}</p>
+                    <p class="meta">By {{ hero_article.author.username }} • {{ hero_article.created_at|date:'M d, Y' }}</p>
+                </div>
+            </article>
+        {% else %}
+            <article class="lead-card">
+                <div class="lead-copy">
+                    <span class="eyebrow">This Week's Hero Story</span>
+                    <h2>No featured hero story yet</h2>
+                    <p>Check back for the latest hero story curated by our editors.</p>
+                </div>
+            </article>
+        {% endif %}
+    </div>
+</section>
+
+<section class="article-cards">
+    <h2>Feature Grid</h2>
+    <div class="featured-grid">
+        {% if featured_articles %}
+            {% for article in featured_articles %}
+                <article class="card-card">
+                    <div class="card-body">
+                        <h3><a href="{% url 'article_detail' article.slug %}">{{ article.title }}</a></h3>
+                        <p>{{ article.summary|default:article.content|truncatechars:110 }}</p>
+                        <p class="meta">By {{ article.author.username }} • {{ article.created_at|date:'M d, Y' }}</p>
+                    </div>
+                </article>
+            {% endfor %}
+        {% else %}
+            <p>No featured stories yet.</p>
+        {% endif %}
+    </div>
+</section>
+
+<section class="latest-row">
+    <div class="section-header">
+        <h2>Latest Articles</h2>
+    </div>
+    <div class="latest-grid">
+        {% for article in recent_articles %}
+            <article class="list-card">
+                <div>
+                    <h3><a href="{% url 'article_detail' article.slug %}">{{ article.title }}</a></h3>
+                    <p>{{ article.summary|default:article.content|truncatechars:120 }}</p>
+                </div>
+                <div class="meta-row">
+                    <span>{{ article.created_at|date:'M d, Y' }}</span>
+                    <a class="button button-small" href="{% url 'article_detail' article.slug %}">Read</a>
+                </div>
+            </article>
+        {% empty %}
+            <p>No recent stories yet.</p>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="newsletter-signup">
+    <h2>Join the Signal Daily mailing list</h2>
+    <p>Get the next story announcement straight to your inbox.</p>
+    <form method="post" action="{% url 'newsletter_signup' %}" class="signup-form">
+        {% csrf_token %}
+        <div class="form-group">{{ signup_form.email }}</div>
+        <button type="submit" class="button">Subscribe</button>
+    </form>
+</section>
+{% endblock %}

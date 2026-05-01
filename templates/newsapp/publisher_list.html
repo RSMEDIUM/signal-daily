@@ -1,0 +1,22 @@
+{% extends 'newsapp/base.html' %}
+{% block content %}
+<section class="page-header">
+    <h1>Publications</h1>
+    <a class="button" href="{% url 'create_publisher' %}">Create Publication</a>
+</section>
+<section class="article-listing-container">
+    {% for publisher in publishers %}
+        <article class="list-card">
+            <div>
+                <h2>{{ publisher.name }}</h2>
+                <p>{{ publisher.description|truncatechars:140 }}</p>
+            </div>
+            <div class="meta-row">
+                <a class="button button-small" href="{% url 'edit_publisher' publisher.pk %}">Edit</a>
+            </div>
+        </article>
+    {% empty %}
+        <p>No publications defined yet.</p>
+    {% endfor %}
+</section>
+{% endblock %}

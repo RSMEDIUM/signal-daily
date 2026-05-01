@@ -1,0 +1,25 @@
+{% extends 'newsapp/base.html' %}
+{% block content %}
+<section class="page-header">
+    <h1>All Published Articles</h1>
+    {% if user.is_authenticated and user.is_superuser or user.is_authenticated and user.role == 'journalist' or user.is_authenticated and user.role == 'editor' %}
+        <a class="button" href="{% url 'create_article' %}">New Article</a>
+    {% endif %}
+</section>
+<div class="article-listing-container">
+    {% for article in articles %}
+        <article class="list-card">
+            <div>
+                <h2><a href="{% url 'article_detail' article.slug %}">{{ article.title }}</a></h2>
+                <p>{{ article.summary|default:article.content|truncatechars:140 }}</p>
+            </div>
+            <div class="meta-row">
+                <small>{{ article.author.username }} • {{ article.created_at|date:'M d, Y' }}</small>
+                <a href="{% url 'article_detail' article.slug %}" class="button button-small">Read</a>
+            </div>
+        </article>
+    {% empty %}
+        <p>No articles published yet.</p>
+    {% endfor %}
+</div>
+{% endblock %}
