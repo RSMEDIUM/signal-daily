@@ -1,4 +1,11 @@
-"""Signal handlers for permissions setup and article approval actions."""
+"""Signal handlers for permissions setup and article approval actions.
+
+This module defines Django signal receivers that:
+- Create default user groups and permissions after migrations
+- Create demo users for development/testing
+- Send email notifications when articles are approved
+- Log article approvals to internal API endpoints
+"""
 
 import requests
 from django.conf import settings
@@ -22,6 +29,11 @@ DEFAULT_USERS = [
 
 
 def create_default_users():
+    """Create default demo users for testing and demonstration purposes.
+    
+    Creates reader, journalist, editor, and superuser accounts with predefined
+    credentials for development and testing environments.
+    """
     for username, email, password, role, is_superuser in DEFAULT_USERS:
         if not SignalDailyUser.objects.filter(username=username).exists():
             if is_superuser:
@@ -34,7 +46,15 @@ def create_default_users():
 
 @receiver(post_migrate)
 def create_default_groups(sender, **kwargs):
-    """Ensure Reader, Journalist, and Editor groups exist after migrations."""
+    """Ensure Reader, Journalist, and Editor groups exist after migrations.
+    
+    Creates role-based groups with appropriate permissions for articles and
+    newsletters. Also creates default demo users for testing.
+    
+    Args:
+        sender: The application config that triggered the migration.
+        **kwargs: Additional keyword arguments from the signal.
+    """
     if sender.name != 'newsapp':
         return
 
@@ -73,7 +93,16 @@ def create_default_groups(sender, **kwargs):
 
 @receiver(pre_save, sender=Article)
 def cache_article_status(sender, instance, **kwargs):
-    """Cache whether an article was previously approved before save."""
+    """Cache whether an article was previously approved before save.
+    
+    Stores the previous approval status to detect when an article transitions
+    from unapproved to approved, triggering notification workflows.
+    
+    Args:
+        sender: The Article model class.
+        instance: The article instance being saved.
+        **kwargs: Additional keyword arguments from the signal.
+    """
     if instance.pk:
         old = Article.objects.filter(pk=instance.pk).first()
         instance._was_approved = old.approved if old else False
@@ -83,7 +112,18 @@ def cache_article_status(sender, instance, **kwargs):
 
 @receiver(post_save, sender=Article)
 def handle_article_approval(sender, instance, created, **kwargs):
-    """Email subscribers and log approval to the internal API after article approval."""
+    """Email subscribers and log approval to the internal API after article approval.
+    
+    When an article transitions from unapproved to approved, this handler:
+    1. Sends email notifications to all subscribers of the publisher/journalist
+    2. Logs the approval event to an internal API endpoint
+    
+    Args:
+        sender: The Article model class.
+        instance: The article instance that was saved.
+        created (bool): Whether this is a new article or an update.
+        **kwargs: Additional keyword arguments from the signal.
+    """
     if instance._was_approved or not instance.approved:
         return
 
