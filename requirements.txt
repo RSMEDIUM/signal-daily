@@ -3,3 +3,5 @@ djangorestframework
 requests
 Pillow
 mysql-connector-python
+sphinx
+sphinx-rtd-theme
