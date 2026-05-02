@@ -1,0 +1,185 @@
+Signal Daily - Django News Application
+HyperionDev Capstone Project - Consolidation 1
+
+================================================================================
+IMPORTANT: Public GitHub Repository Link
+================================================================================
+
+GitHub Repository URL: [TO BE ADDED AFTER PUSHING TO GITHUB]
+
+Please replace the above placeholder with your actual GitHub repository URL after
+completing the setup instructions below.
+
+================================================================================
+Project Overview
+================================================================================
+
+This Django-based news application includes:
+✓ Version control with Git (multiple branches: master, docs, container)
+✓ Comprehensive Sphinx documentation in docs/ folder
+✓ Docker containerization with Dockerfile
+✓ Complete README.md with setup instructions
+✓ .gitignore file to exclude unnecessary files
+✓ Enhanced docstrings for models, views, signals, and serializers
+
+================================================================================
+Git Repository Structure
+================================================================================
+
+Branches:
+1. master/main - Production-ready code with all features merged
+2. docs       - Documentation enhancements and Sphinx setup
+3. container  - Dockerization implementation
+
+The master branch contains the merged changes from both docs and container
+branches, following the workflow specified in the assignment.
+
+================================================================================
+Steps to Push to GitHub
+================================================================================
+
+1. Create a new public repository on GitHub:
+   - Go to https://github.com/new
+   - Name: signaldaily or signal-daily-news
+   - Description: Django news application with role-based access control
+   - Visibility: PUBLIC (very important!)
+   - Do NOT initialize with README, .gitignore, or license
+   
+2. Push your local repository to GitHub:
+   
+   git remote add origin https://github.com/YOUR_USERNAME/REPO_NAME.git
+   git branch -M master
+   git push -u origin master
+   git push origin docs
+   git push origin container
+
+3. Verify all branches are pushed:
+   - Check https://github.com/YOUR_USERNAME/REPO_NAME/branches
+   - You should see master, docs, and container branches
+
+4. Update this file (capstone.txt) with your repository URL
+
+================================================================================
+Documentation Access
+================================================================================
+
+The Sphinx documentation can be viewed by:
+1. Cloning the repository
+2. Opening docs/build/index.html in a web browser
+
+The documentation includes:
+- Comprehensive API reference
+- Module documentation for newsapp
+- Detailed docstrings for all functions and classes
+
+================================================================================
+Docker Testing
+================================================================================
+
+To verify the Docker container works:
+
+1. Local Testing:
+   docker build -t signaldaily .
+   docker run -p 8000:8000 signaldaily
+   # Access at http://localhost:8000
+
+2. Docker Playground Testing:
+   - Visit https://labs.play-with-docker.com/
+   - Clone your repository
+   - Build and run the Docker container
+   - Test the application
+
+================================================================================
+Database Notes (FOR REVIEWER)
+================================================================================
+
+The application uses SQLite by default for development, which requires no
+additional setup. The db.sqlite3 file is excluded from Git as per the
+.gitignore configuration.
+
+For MariaDB/MySQL setup (optional), detailed instructions are provided in the
+README.md file.
+
+================================================================================
+Demo Credentials
+================================================================================
+
+The application automatically creates demo users for testing:
+- Reader:     demo_reader / readerpass
+- Journalist: demo_writer / writerpass
+- Editor:     demo_editor / editorpass
+- Admin:      ryan / ryanpass
+
+================================================================================
+Project Highlights
+================================================================================
+
+✓ Clean, well-documented code following PEP 8 standards
+✓ Modular design with separation of concerns
+✓ Comprehensive error handling and validation
+✓ Role-based access control (Reader, Journalist, Editor)
+✓ REST API with token authentication
+✓ Email notifications for article approvals
+✓ Responsive design with modern UI
+✓ Docker-ready for easy deployment
+✓ Extensive documentation via Sphinx
+
+================================================================================
+Files Included in Submission
+================================================================================
+
+- capstone.txt (this file)
+- Complete Django project with all source code
+- .gitignore file
+- Dockerfile and .dockerignore
+- requirements.txt
+- README.md with comprehensive instructions
+- docs/ folder with generated Sphinx documentation
+- All necessary templates, static files, and migrations
+
+================================================================================
+Submission Checklist
+================================================================================
+
+☑ Local Git repository initialized
+☑ .gitignore file added
+☑ Initial commit to local repository
+☑ 'docs' branch created with docstrings
+☑ Multiple commits on docs branch (one per file documented)
+☑ Sphinx documentation generated in docs/ folder
+☑ All changes committed to docs branch
+☑ Switched to master branch
+☑ 'container' branch created from master
+☑ Dockerfile added and committed to container branch
+☑ Switched back to master branch
+☑ Merged docs branch into master
+☑ Merged container branch into master
+☑ README.md added with setup instructions for venv and Docker
+☑ Public GitHub repository created
+☐ Local repository pushed to GitHub (TO BE COMPLETED)
+☐ capstone.txt updated with GitHub URL (TO BE COMPLETED)
+
+================================================================================
+Important Reminders
+================================================================================
+
+1. Ensure the GitHub repository is PUBLIC, not private
+2. Do NOT commit sensitive information (passwords, API keys, etc.)
+3. The .env file is excluded via .gitignore (good practice)
+4. Database file (db.sqlite3) is excluded via .gitignore
+5. Virtual environment folders are excluded via .gitignore
+6. Documentation build files ARE included (as per assignment requirements)
+
+================================================================================
+Support & Resources
+================================================================================
+
+For questions or issues:
+1. Check the README.md file
+2. Review the Sphinx documentation in docs/build/index.html
+3. Examine the code comments and docstrings
+4. Review Git commit history: git log --graph --all --oneline
+
+================================================================================
+End of File
+================================================================================
