@@ -1,0 +1,287 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>newsapp.signals &mdash; Signal Daily 1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=f2a433a1"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Signal Daily
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">newsapp</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Signal Daily</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">newsapp.signals</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for newsapp.signals</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Signal handlers for permissions setup and article approval actions.</span>
+
+<span class="sd">This module defines Django signal receivers that:</span>
+<span class="sd">- Create default user groups and permissions after migrations</span>
+<span class="sd">- Create demo users for development/testing</span>
+<span class="sd">- Send email notifications when articles are approved</span>
+<span class="sd">- Log article approvals to internal API endpoints</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">requests</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">django.conf</span><span class="w"> </span><span class="kn">import</span> <span class="n">settings</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">django.contrib.auth.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">Group</span><span class="p">,</span> <span class="n">Permission</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">django.contrib.contenttypes.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">ContentType</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">django.core.mail</span><span class="w"> </span><span class="kn">import</span> <span class="n">send_mail</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">django.db</span><span class="w"> </span><span class="kn">import</span> <span class="n">OperationalError</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">django.db.models.signals</span><span class="w"> </span><span class="kn">import</span> <span class="n">post_migrate</span><span class="p">,</span> <span class="n">post_save</span><span class="p">,</span> <span class="n">pre_save</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">django.dispatch</span><span class="w"> </span><span class="kn">import</span> <span class="n">receiver</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">django.urls</span><span class="w"> </span><span class="kn">import</span> <span class="n">reverse</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">Article</span><span class="p">,</span> <span class="n">Newsletter</span><span class="p">,</span> <span class="n">Publisher</span><span class="p">,</span> <span class="n">SignalDailyUser</span>
+
+
+<span class="n">DEFAULT_USERS</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="p">(</span><span class="s1">&#39;demo_reader&#39;</span><span class="p">,</span> <span class="s1">&#39;demo_reader@example.com&#39;</span><span class="p">,</span> <span class="s1">&#39;readerpass&#39;</span><span class="p">,</span> <span class="s1">&#39;reader&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span>
+    <span class="p">(</span><span class="s1">&#39;demo_writer&#39;</span><span class="p">,</span> <span class="s1">&#39;demo_writer@example.com&#39;</span><span class="p">,</span> <span class="s1">&#39;writerpass&#39;</span><span class="p">,</span> <span class="s1">&#39;journalist&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span>
+    <span class="p">(</span><span class="s1">&#39;demo_editor&#39;</span><span class="p">,</span> <span class="s1">&#39;demo_editor@example.com&#39;</span><span class="p">,</span> <span class="s1">&#39;editorpass&#39;</span><span class="p">,</span> <span class="s1">&#39;editor&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span>
+    <span class="p">(</span><span class="s1">&#39;ryan&#39;</span><span class="p">,</span> <span class="s1">&#39;ryan@example.com&#39;</span><span class="p">,</span> <span class="s1">&#39;ryanpass&#39;</span><span class="p">,</span> <span class="s1">&#39;editor&#39;</span><span class="p">,</span> <span class="kc">True</span><span class="p">),</span>
+<span class="p">]</span>
+
+
+<div class="viewcode-block" id="create_default_users">
+<a class="viewcode-back" href="../../newsapp.html#newsapp.signals.create_default_users">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">create_default_users</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Create default demo users for testing and demonstration purposes.</span>
+<span class="sd">    </span>
+<span class="sd">    Creates reader, journalist, editor, and superuser accounts with predefined</span>
+<span class="sd">    credentials for development and testing environments.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">for</span> <span class="n">username</span><span class="p">,</span> <span class="n">email</span><span class="p">,</span> <span class="n">password</span><span class="p">,</span> <span class="n">role</span><span class="p">,</span> <span class="n">is_superuser</span> <span class="ow">in</span> <span class="n">DEFAULT_USERS</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">SignalDailyUser</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">username</span><span class="o">=</span><span class="n">username</span><span class="p">)</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">is_superuser</span><span class="p">:</span>
+                <span class="n">user</span> <span class="o">=</span> <span class="n">SignalDailyUser</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">create_superuser</span><span class="p">(</span><span class="n">username</span><span class="o">=</span><span class="n">username</span><span class="p">,</span> <span class="n">email</span><span class="o">=</span><span class="n">email</span><span class="p">,</span> <span class="n">password</span><span class="o">=</span><span class="n">password</span><span class="p">)</span>
+                <span class="n">user</span><span class="o">.</span><span class="n">role</span> <span class="o">=</span> <span class="n">role</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">user</span> <span class="o">=</span> <span class="n">SignalDailyUser</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">create_user</span><span class="p">(</span><span class="n">username</span><span class="o">=</span><span class="n">username</span><span class="p">,</span> <span class="n">email</span><span class="o">=</span><span class="n">email</span><span class="p">,</span> <span class="n">password</span><span class="o">=</span><span class="n">password</span><span class="p">,</span> <span class="n">role</span><span class="o">=</span><span class="n">role</span><span class="p">)</span>
+            <span class="n">user</span><span class="o">.</span><span class="n">save</span><span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="create_default_groups">
+<a class="viewcode-back" href="../../newsapp.html#newsapp.signals.create_default_groups">[docs]</a>
+<span class="nd">@receiver</span><span class="p">(</span><span class="n">post_migrate</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">create_default_groups</span><span class="p">(</span><span class="n">sender</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Ensure Reader, Journalist, and Editor groups exist after migrations.</span>
+<span class="sd">    </span>
+<span class="sd">    Creates role-based groups with appropriate permissions for articles and</span>
+<span class="sd">    newsletters. Also creates default demo users for testing.</span>
+<span class="sd">    </span>
+<span class="sd">    Args:</span>
+<span class="sd">        sender: The application config that triggered the migration.</span>
+<span class="sd">        **kwargs: Additional keyword arguments from the signal.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">sender</span><span class="o">.</span><span class="n">name</span> <span class="o">!=</span> <span class="s1">&#39;newsapp&#39;</span><span class="p">:</span>
+        <span class="k">return</span>
+
+    <span class="n">article_ct</span> <span class="o">=</span> <span class="n">ContentType</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get_for_model</span><span class="p">(</span><span class="n">Article</span><span class="p">)</span>
+    <span class="n">newsletter_ct</span> <span class="o">=</span> <span class="n">ContentType</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get_for_model</span><span class="p">(</span><span class="n">Newsletter</span><span class="p">)</span>
+
+    <span class="n">reader</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">Group</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">&#39;Reader&#39;</span><span class="p">)</span>
+    <span class="n">journalist</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">Group</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">&#39;Journalist&#39;</span><span class="p">)</span>
+    <span class="n">editor</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">Group</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">&#39;Editor&#39;</span><span class="p">)</span>
+
+    <span class="n">reader_permissions</span> <span class="o">=</span> <span class="n">Permission</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span>
+        <span class="n">content_type__in</span><span class="o">=</span><span class="p">[</span><span class="n">article_ct</span><span class="p">,</span> <span class="n">newsletter_ct</span><span class="p">],</span> <span class="n">codename__startswith</span><span class="o">=</span><span class="s1">&#39;view&#39;</span>
+    <span class="p">)</span>
+    <span class="n">journalist_permissions</span> <span class="o">=</span> <span class="n">Permission</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span>
+        <span class="n">content_type__in</span><span class="o">=</span><span class="p">[</span><span class="n">article_ct</span><span class="p">,</span> <span class="n">newsletter_ct</span><span class="p">],</span> <span class="n">codename__in</span><span class="o">=</span><span class="p">[</span>
+            <span class="s1">&#39;add_article&#39;</span><span class="p">,</span> <span class="s1">&#39;change_article&#39;</span><span class="p">,</span> <span class="s1">&#39;delete_article&#39;</span><span class="p">,</span> <span class="s1">&#39;view_article&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;add_newsletter&#39;</span><span class="p">,</span> <span class="s1">&#39;change_newsletter&#39;</span><span class="p">,</span> <span class="s1">&#39;delete_newsletter&#39;</span><span class="p">,</span> <span class="s1">&#39;view_newsletter&#39;</span><span class="p">,</span>
+        <span class="p">]</span>
+    <span class="p">)</span>
+    <span class="n">editor_permissions</span> <span class="o">=</span> <span class="n">Permission</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span>
+        <span class="n">content_type__in</span><span class="o">=</span><span class="p">[</span><span class="n">article_ct</span><span class="p">,</span> <span class="n">newsletter_ct</span><span class="p">],</span> <span class="n">codename__in</span><span class="o">=</span><span class="p">[</span>
+            <span class="s1">&#39;change_article&#39;</span><span class="p">,</span> <span class="s1">&#39;delete_article&#39;</span><span class="p">,</span> <span class="s1">&#39;view_article&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;change_newsletter&#39;</span><span class="p">,</span> <span class="s1">&#39;delete_newsletter&#39;</span><span class="p">,</span> <span class="s1">&#39;view_newsletter&#39;</span><span class="p">,</span>
+        <span class="p">]</span>
+    <span class="p">)</span>
+
+    <span class="n">reader</span><span class="o">.</span><span class="n">permissions</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">reader_permissions</span><span class="p">)</span>
+    <span class="n">journalist</span><span class="o">.</span><span class="n">permissions</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">journalist_permissions</span><span class="p">)</span>
+    <span class="n">editor</span><span class="o">.</span><span class="n">permissions</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">editor_permissions</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">create_default_users</span><span class="p">()</span>
+    <span class="k">except</span> <span class="n">OperationalError</span><span class="p">:</span>
+        <span class="k">pass</span></div>
+
+
+
+<div class="viewcode-block" id="cache_article_status">
+<a class="viewcode-back" href="../../newsapp.html#newsapp.signals.cache_article_status">[docs]</a>
+<span class="nd">@receiver</span><span class="p">(</span><span class="n">pre_save</span><span class="p">,</span> <span class="n">sender</span><span class="o">=</span><span class="n">Article</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">cache_article_status</span><span class="p">(</span><span class="n">sender</span><span class="p">,</span> <span class="n">instance</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Cache whether an article was previously approved before save.</span>
+<span class="sd">    </span>
+<span class="sd">    Stores the previous approval status to detect when an article transitions</span>
+<span class="sd">    from unapproved to approved, triggering notification workflows.</span>
+<span class="sd">    </span>
+<span class="sd">    Args:</span>
+<span class="sd">        sender: The Article model class.</span>
+<span class="sd">        instance: The article instance being saved.</span>
+<span class="sd">        **kwargs: Additional keyword arguments from the signal.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">instance</span><span class="o">.</span><span class="n">pk</span><span class="p">:</span>
+        <span class="n">old</span> <span class="o">=</span> <span class="n">Article</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">pk</span><span class="o">=</span><span class="n">instance</span><span class="o">.</span><span class="n">pk</span><span class="p">)</span><span class="o">.</span><span class="n">first</span><span class="p">()</span>
+        <span class="n">instance</span><span class="o">.</span><span class="n">_was_approved</span> <span class="o">=</span> <span class="n">old</span><span class="o">.</span><span class="n">approved</span> <span class="k">if</span> <span class="n">old</span> <span class="k">else</span> <span class="kc">False</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">instance</span><span class="o">.</span><span class="n">_was_approved</span> <span class="o">=</span> <span class="kc">False</span></div>
+
+
+
+<div class="viewcode-block" id="handle_article_approval">
+<a class="viewcode-back" href="../../newsapp.html#newsapp.signals.handle_article_approval">[docs]</a>
+<span class="nd">@receiver</span><span class="p">(</span><span class="n">post_save</span><span class="p">,</span> <span class="n">sender</span><span class="o">=</span><span class="n">Article</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">handle_article_approval</span><span class="p">(</span><span class="n">sender</span><span class="p">,</span> <span class="n">instance</span><span class="p">,</span> <span class="n">created</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Email subscribers and log approval to the internal API after article approval.</span>
+<span class="sd">    </span>
+<span class="sd">    When an article transitions from unapproved to approved, this handler:</span>
+<span class="sd">    1. Sends email notifications to all subscribers of the publisher/journalist</span>
+<span class="sd">    2. Logs the approval event to an internal API endpoint</span>
+<span class="sd">    </span>
+<span class="sd">    Args:</span>
+<span class="sd">        sender: The Article model class.</span>
+<span class="sd">        instance: The article instance that was saved.</span>
+<span class="sd">        created (bool): Whether this is a new article or an update.</span>
+<span class="sd">        **kwargs: Additional keyword arguments from the signal.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">instance</span><span class="o">.</span><span class="n">_was_approved</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">instance</span><span class="o">.</span><span class="n">approved</span><span class="p">:</span>
+        <span class="k">return</span>
+
+    <span class="n">subscriber_emails</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">instance</span><span class="o">.</span><span class="n">publisher</span><span class="p">:</span>
+        <span class="n">subscriber_emails</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">instance</span><span class="o">.</span><span class="n">publisher</span><span class="o">.</span><span class="n">subscribers</span><span class="o">.</span><span class="n">values_list</span><span class="p">(</span><span class="s1">&#39;email&#39;</span><span class="p">,</span> <span class="n">flat</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">subscriber_emails</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">instance</span><span class="o">.</span><span class="n">author</span><span class="o">.</span><span class="n">journalist_subscribers</span><span class="o">.</span><span class="n">values_list</span><span class="p">(</span><span class="s1">&#39;email&#39;</span><span class="p">,</span> <span class="n">flat</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+
+    <span class="n">subscriber_emails</span> <span class="o">=</span> <span class="p">{</span><span class="n">email</span> <span class="k">for</span> <span class="n">email</span> <span class="ow">in</span> <span class="n">subscriber_emails</span> <span class="k">if</span> <span class="n">email</span><span class="p">}</span>
+    <span class="k">if</span> <span class="n">subscriber_emails</span><span class="p">:</span>
+        <span class="n">article_url</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">settings</span><span class="o">.</span><span class="n">SITE_URL</span><span class="si">}{</span><span class="n">reverse</span><span class="p">(</span><span class="s1">&#39;article_detail&#39;</span><span class="p">,</span><span class="w"> </span><span class="n">kwargs</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;slug&#39;</span><span class="p">:</span><span class="w"> </span><span class="n">instance</span><span class="o">.</span><span class="n">slug</span><span class="p">})</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="n">html_message</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">            &lt;html&gt;</span>
+<span class="s2">                &lt;body style=&quot;font-family:Arial,sans-serif;color:#333;&quot;&gt;</span>
+<span class="s2">                    &lt;div style=&quot;max-width:680px;margin:0 auto;padding:24px;&quot;&gt;</span>
+<span class="s2">                        &lt;img src=&quot;</span><span class="si">{</span><span class="n">settings</span><span class="o">.</span><span class="n">SITE_URL</span><span class="si">}</span><span class="s2">/media/logo.png&quot; alt=&quot;Signal Daily&quot; style=&quot;max-height:60px;display:block;margin-bottom:24px;&quot; /&gt;</span>
+<span class="s2">                        &lt;h1 style=&quot;color:#1a1a1a;&quot;&gt;Welcome from Signal Daily&lt;/h1&gt;</span>
+<span class="s2">                        &lt;p style=&quot;font-size:16px;line-height:1.6;&quot;&gt;A new article has just been approved.&lt;/p&gt;</span>
+<span class="s2">                        &lt;h2 style=&quot;margin-top:24px;&quot;&gt;</span><span class="si">{</span><span class="n">instance</span><span class="o">.</span><span class="n">title</span><span class="si">}</span><span class="s2">&lt;/h2&gt;</span>
+<span class="s2">                        &lt;p style=&quot;font-size:15px;line-height:1.7;&quot;&gt;</span><span class="si">{</span><span class="n">instance</span><span class="o">.</span><span class="n">summary</span><span class="w"> </span><span class="ow">or</span><span class="w"> </span><span class="n">instance</span><span class="o">.</span><span class="n">content</span><span class="p">[:</span><span class="mi">220</span><span class="p">]</span><span class="si">}</span><span class="s2">&lt;/p&gt;</span>
+<span class="s2">                        &lt;p&gt;&lt;a href=&quot;</span><span class="si">{</span><span class="n">article_url</span><span class="si">}</span><span class="s2">&quot; style=&quot;display:inline-block;padding:14px 24px;background:#222;color:#fff;text-decoration:none;border-radius:4px;&quot;&gt;Read the full article&lt;/a&gt;&lt;/p&gt;</span>
+<span class="s2">                        &lt;hr style=&quot;margin:32px 0;border:none;border-top:1px solid #ddd;&quot; /&gt;</span>
+<span class="s2">                        &lt;p style=&quot;font-size:14px;color:#777;&quot;&gt;Sent by Signal Daily&lt;/p&gt;</span>
+<span class="s2">                    &lt;/div&gt;</span>
+<span class="s2">                &lt;/body&gt;</span>
+<span class="s2">            &lt;/html&gt;</span>
+<span class="s2">        &quot;&quot;&quot;</span>
+        <span class="n">send_mail</span><span class="p">(</span>
+            <span class="n">subject</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;New approved article on Signal Daily: </span><span class="si">{</span><span class="n">instance</span><span class="o">.</span><span class="n">title</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span>
+            <span class="n">message</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">instance</span><span class="o">.</span><span class="n">summary</span><span class="w"> </span><span class="ow">or</span><span class="w"> </span><span class="n">instance</span><span class="o">.</span><span class="n">title</span><span class="si">}</span><span class="se">\n</span><span class="s2">Read more at </span><span class="si">{</span><span class="n">article_url</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">from_email</span><span class="o">=</span><span class="n">settings</span><span class="o">.</span><span class="n">DEFAULT_FROM_EMAIL</span><span class="p">,</span>
+            <span class="n">recipient_list</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="n">subscriber_emails</span><span class="p">),</span>
+            <span class="n">html_message</span><span class="o">=</span><span class="n">html_message</span><span class="p">,</span>
+            <span class="n">fail_silently</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">api_url</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">settings</span><span class="o">.</span><span class="n">SITE_URL</span><span class="si">}{</span><span class="n">reverse</span><span class="p">(</span><span class="s1">&#39;api-approved&#39;</span><span class="p">)</span><span class="si">}</span><span class="s1">&#39;</span>
+        <span class="n">requests</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="n">api_url</span><span class="p">,</span> <span class="n">json</span><span class="o">=</span><span class="p">{</span>
+            <span class="s1">&#39;title&#39;</span><span class="p">:</span> <span class="n">instance</span><span class="o">.</span><span class="n">title</span><span class="p">,</span>
+            <span class="s1">&#39;summary&#39;</span><span class="p">:</span> <span class="n">instance</span><span class="o">.</span><span class="n">summary</span><span class="p">,</span>
+            <span class="s1">&#39;author&#39;</span><span class="p">:</span> <span class="n">instance</span><span class="o">.</span><span class="n">author</span><span class="o">.</span><span class="n">username</span><span class="p">,</span>
+            <span class="s1">&#39;publisher&#39;</span><span class="p">:</span> <span class="n">instance</span><span class="o">.</span><span class="n">publisher</span><span class="o">.</span><span class="n">name</span> <span class="k">if</span> <span class="n">instance</span><span class="o">.</span><span class="n">publisher</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="s1">&#39;approved_at&#39;</span><span class="p">:</span> <span class="n">instance</span><span class="o">.</span><span class="n">created_at</span><span class="o">.</span><span class="n">isoformat</span><span class="p">(),</span>
+        <span class="p">},</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+    <span class="k">except</span> <span class="n">requests</span><span class="o">.</span><span class="n">RequestException</span><span class="p">:</span>
+        <span class="k">pass</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, HyperionDev Student.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
